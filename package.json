@@ -19,7 +19,8 @@
     "bin",
     "dist",
     "templates",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md"
   ],
   "scripts": {
     "build": "vite build",

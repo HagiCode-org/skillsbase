@@ -1,0 +1,49 @@
+{
+  "name": "@hagicode/skillsbase",
+  "version": "0.1.0-dev.20260406025440.0.0.local",
+  "description": "Managed skills repository CLI",
+  "homepage": "https://github.com/HagiCode-org/skillsbase#readme",
+  "bugs": {
+    "url": "https://github.com/HagiCode-org/skillsbase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HagiCode-org/skillsbase.git"
+  },
+  "type": "module",
+  "packageManager": "npm@10.9.2",
+  "bin": {
+    "skillsbase": "./bin/skillsbase.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "rm -rf dist",
+    "cli": "node --import tsx ./src/cli-entry.ts",
+    "pack:check": "node ./scripts/verify-package.mjs",
+    "publish:prepare-dev-version": "node ./scripts/prepare-dev-version.mjs",
+    "publish:verify-release": "node ./scripts/verify-release-version.mjs",
+    "test": "node --import tsx --test ./tests/*.test.ts",
+    "smoke": "node --import tsx ./scripts/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.9.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}

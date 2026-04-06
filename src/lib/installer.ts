@@ -22,6 +22,20 @@ interface InstallOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+const INSTALL_TIMEOUT_MS = 180_000;
+const REMOTE_INSTALL_RETRIES = 3;
+const NPM_ENV_KEYS_TO_UNSET = [
+  "INIT_CWD",
+  "npm_command",
+  "npm_config_local_prefix",
+  "npm_config_prefix",
+  "npm_execpath",
+  "npm_lifecycle_event",
+  "npm_lifecycle_script",
+  "npm_package_json",
+  "npm_prefix",
+];
+
 function toInstallReference(entry: ManifestEntry): string {
   if (entry.remoteSource) {
     return entry.sourcePath;
@@ -47,6 +61,30 @@ function renderExecFailure(error: unknown): string {
   return String(error);
 }
 
+async function execSkillsAdd(
+  repoPath: string,
+  manifest: Manifest,
+  installReference: string,
+  options: InstallOptions,
+): Promise<void> {
+  const childEnv = { ...(options.env ?? process.env) };
+  for (const key of NPM_ENV_KEYS_TO_UNSET) {
+    delete childEnv[key];
+  }
+  childEnv.INIT_CWD = repoPath;
+
+  await execFile(
+    "npx",
+    buildNpxArgs(manifest, "add", [installReference, "--agent", manifest.installAgent, "--copy", "-y"]),
+      {
+        cwd: repoPath,
+        env: childEnv,
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: INSTALL_TIMEOUT_MS,
+      },
+    );
+}
+
 export async function installIntoCurrentRepository(
   repoPath: string,
   manifest: Manifest,
@@ -64,20 +102,28 @@ export async function installIntoCurrentRepository(
     installReference,
   };
 
-  try {
-    await execFile(
-      "npx",
-      buildNpxArgs(manifest, "add", [installReference, "--agent", manifest.installAgent, "--copy", "-y"]),
-      {
-        cwd: repoPath,
-        env: options.env,
-        maxBuffer: 16 * 1024 * 1024,
-        timeout: 60_000,
-      },
-    );
-  } catch (error) {
+  const attempts = entry.remoteSource ? REMOTE_INSTALL_RETRIES : 1;
+  const failures: string[] = [];
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await execSkillsAdd(repoPath, manifest, installReference, options);
+      failures.length = 0;
+      break;
+    } catch (error) {
+      failures.push(`attempt ${attempt}/${attempts}: ${renderExecFailure(error)}`);
+
+      await restoreSnapshot(snapshot);
+
+      if (attempt === attempts) {
+        break;
+      }
+    }
+  }
+
+  if (failures.length > 0) {
     throw new CliError(`skills install failed for ${entry.originalName}.`, {
-      details: [renderExecFailure(error)],
+      details: failures,
     });
   }
 
@@ -97,39 +143,18 @@ export async function installIntoCurrentRepository(
 
 export async function cleanupInstalledSkill(
   repoPath: string,
-  manifest: Manifest,
+  _manifest: Manifest,
   entry: ManifestEntry,
   installState: InstallState,
-  options: InstallOptions = {},
+  _options: InstallOptions = {},
 ): Promise<void> {
-  let removeError: ExecFileFailure | null = null;
-
-  try {
-    await execFile("npx", buildNpxArgs(manifest, "remove", [entry.originalName, "-y"]), {
-      cwd: repoPath,
-      env: options.env,
-      maxBuffer: 16 * 1024 * 1024,
-      timeout: 60_000,
-    });
-  } catch (error) {
-    removeError = error as ExecFileFailure;
-  }
-
   try {
     await restoreSnapshot(installState.snapshot);
     await removeIfEmptyUpward(path.join(repoPath, ".agents", "skills"), repoPath);
   } catch (restoreError) {
     const restoreMessage = restoreError instanceof Error ? restoreError.message : String(restoreError);
     throw new CliError(`Cleanup failed for ${entry.originalName}.`, {
-      details: [restoreMessage, removeError ? renderExecFailure(removeError) : null].filter(
-        (value): value is string => Boolean(value),
-      ),
-    });
-  }
-
-  if (removeError) {
-    throw new CliError(`skills uninstall failed for ${entry.originalName}.`, {
-      details: [renderExecFailure(removeError)],
+      details: [restoreMessage],
     });
   }
 }

@@ -160,6 +160,13 @@ async function read(relativePath, repoPath) {
   return fs.readFile(path.join(repoPath, relativePath), "utf8");
 }
 
+async function exists(targetPath) {
+  return fs
+    .access(targetPath)
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function writeManifest(repoPath, content) {
   await fs.mkdir(repoPath, { recursive: true });
   await fs.writeFile(path.join(repoPath, "sources.yaml"), content, "utf8");
@@ -296,6 +303,192 @@ test("add updates the manifest and reuses the sync pipeline", async () => {
   await fs.access(path.join(repoPath, "skills", "beta", "SKILL.md"));
 });
 
+test("remove updates the manifest and prunes stale managed output", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const firstPartyRoot = path.join(tempRoot, "first-party");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await createSkill(firstPartyRoot, "alpha");
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: first-party
+    label: "First-party local skills"
+    kind: first-party
+    root: ${firstPartyRoot}
+    targetPrefix: ""
+    include:
+      - alpha
+`,
+  );
+
+  await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
+  const result = await runCommand({ cwd: repoPath, env, args: ["remove", "--repo", repoPath, "alpha"] });
+
+  assert.equal(result.exitCode, 0);
+  assert.doesNotMatch(await read("sources.yaml", repoPath), /\n\s+- alpha\b/);
+  assert.equal(await exists(path.join(repoPath, "skills", "alpha")), false);
+  assert.match(result.stdout, /removed stale: skills\/alpha/);
+});
+
+test("remove supports explicit source selection for duplicate skill names", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const firstPartyRoot = path.join(tempRoot, "first-party");
+  const systemRoot = path.join(tempRoot, "system");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await createSkill(firstPartyRoot, "alpha");
+  await createSkill(systemRoot, "alpha");
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: first-party
+    label: "First-party local skills"
+    kind: first-party
+    root: ${firstPartyRoot}
+    targetPrefix: ""
+    include:
+      - alpha
+  - key: system
+    label: "System local skills"
+    kind: system
+    root: ${systemRoot}
+    targetPrefix: "system-"
+    include:
+      - alpha
+`,
+  );
+
+  await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
+  const result = await runCommand({
+    cwd: repoPath,
+    env,
+    args: ["remove", "--repo", repoPath, "--source", "system", "alpha"],
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal((await read("sources.yaml", repoPath)).match(/\n\s+- alpha\b/g)?.length ?? 0, 1);
+  assert.equal(await exists(path.join(repoPath, "skills", "alpha", "SKILL.md")), true);
+  assert.equal(await exists(path.join(repoPath, "skills", "system-alpha")), false);
+});
+
+test("remove rejects ambiguous skill names without mutating the manifest", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const firstPartyRoot = path.join(tempRoot, "first-party");
+  const systemRoot = path.join(tempRoot, "system");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await createSkill(firstPartyRoot, "alpha");
+  await createSkill(systemRoot, "alpha");
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: first-party
+    label: "First-party local skills"
+    kind: first-party
+    root: ${firstPartyRoot}
+    targetPrefix: ""
+    include:
+      - alpha
+  - key: system
+    label: "System local skills"
+    kind: system
+    root: ${systemRoot}
+    targetPrefix: "system-"
+    include:
+      - alpha
+`,
+  );
+
+  await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
+  const beforeManifest = await read("sources.yaml", repoPath);
+  const result = await runCommand({ cwd: repoPath, env, args: ["remove", "--repo", repoPath, "alpha"] });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /Skill "alpha" is declared in multiple sources/);
+  assert.match(result.stderr, /matching sources: first-party, system/);
+  assert.equal(await read("sources.yaml", repoPath), beforeManifest);
+  assert.equal(await exists(path.join(repoPath, "skills", "alpha", "SKILL.md")), true);
+  assert.equal(await exists(path.join(repoPath, "skills", "system-alpha", "SKILL.md")), true);
+});
+
+test("remove rejects undeclared skills without mutating managed output", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const firstPartyRoot = path.join(tempRoot, "first-party");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await createSkill(firstPartyRoot, "alpha");
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: first-party
+    label: "First-party local skills"
+    kind: first-party
+    root: ${firstPartyRoot}
+    targetPrefix: ""
+    include:
+      - alpha
+`,
+  );
+
+  await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
+  const beforeManifest = await read("sources.yaml", repoPath);
+  const result = await runCommand({ cwd: repoPath, env, args: ["remove", "--repo", repoPath, "beta"] });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /Skill "beta" is not declared in sources\.yaml/);
+  assert.equal(await read("sources.yaml", repoPath), beforeManifest);
+  assert.equal(await exists(path.join(repoPath, "skills", "alpha", "SKILL.md")), true);
+});
+
 test("github_action writes managed workflow and action assets", async () => {
   const tempRoot = await createTempDir();
   const repoPath = path.join(tempRoot, "repo");
@@ -423,7 +616,7 @@ test("sync fails when installed output is invalid", async () => {
   assert.match(result.stderr, /frontmatter/);
 });
 
-test("sync surfaces uninstall cleanup failures", async () => {
+test("sync cleanup is snapshot-based and does not invoke uninstall hooks", async () => {
   const tempRoot = await createTempDir();
   const repoPath = path.join(tempRoot, "repo");
   const firstPartyRoot = path.join(tempRoot, "first-party");
@@ -442,8 +635,9 @@ test("sync surfaces uninstall cleanup failures", async () => {
   });
 
   const result = await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
-  assert.equal(result.exitCode, 1);
-  assert.match(result.stderr, /skills uninstall failed/);
+  assert.equal(result.exitCode, 0);
+  await fs.access(path.join(repoPath, "skills", "alpha", "SKILL.md"));
+  assert.equal(await exists(path.join(repoPath, ".agents")), false);
 });
 
 test("sync resolves repository-local relative source roots outside the repo working directory", async () => {
@@ -546,6 +740,56 @@ sources:
     args: ["sync", "--check", "--repo", repoPath],
   });
   assert.equal(checkResult.exitCode, 0);
+});
+
+test("remove reuses resolved relative source roots when invoked outside the repo working directory", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const externalCwd = path.join(tempRoot, "outside");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await fs.mkdir(externalCwd, { recursive: true });
+  await createSkill(path.join(repoPath, "embedded-sources", "cli"), "hagi");
+
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: embedded-cli
+    label: "Embedded CLI skills"
+    kind: embedded-cli
+    root: embedded-sources/cli
+    targetPrefix: ""
+    include:
+      - hagi
+`,
+  );
+
+  await runCommand({
+    cwd: externalCwd,
+    env,
+    args: ["sync", "--repo", repoPath],
+  });
+
+  const result = await runCommand({
+    cwd: externalCwd,
+    env,
+    args: ["remove", "--repo", repoPath, "hagi"],
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.doesNotMatch(await read("sources.yaml", repoPath), /\n\s+- hagi\b/);
+  assert.equal(await exists(path.join(repoPath, "skills", "hagi")), false);
 });
 
 test("sync supports github repository roots via repo@skill references", async () => {

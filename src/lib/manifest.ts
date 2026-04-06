@@ -25,6 +25,10 @@ interface AddSkillOptions {
   sourceKey?: string;
 }
 
+interface RemoveSkillOptions {
+  sourceKey?: string;
+}
+
 function parseScalar(rawValue: string): ManifestScalar {
   const value = rawValue.trim();
   if (value.length === 0) {
@@ -117,6 +121,71 @@ function resolveSourcePath(repoPath: string, source: SourceDefinition, originalN
   }
 
   return path.join(resolveSourceRoot(repoPath, source), originalName);
+}
+
+function cloneSource(source: SourceDefinition): SourceDefinition {
+  return {
+    ...source,
+    include: [...(source.include ?? [])],
+  };
+}
+
+function cloneManifestWithSources(manifest: Manifest, sources: SourceDefinition[]): Manifest {
+  return {
+    ...manifest,
+    sources: sources.map(cloneSource),
+  };
+}
+
+function sortInclude(include: Iterable<string>): string[] {
+  return [...include].sort((left, right) => left.localeCompare(right));
+}
+
+function assertManifestHasSources(manifest: Manifest): void {
+  if (manifest.sources.length === 0) {
+    throw new CliError("Manifest does not declare any source blocks.", {
+      details: ["Run `skillsbase init` first or add a source block to `sources.yaml`."],
+    });
+  }
+}
+
+function getSourceKeys(manifest: Manifest): string {
+  return manifest.sources.map((source) => source.key).join(", ");
+}
+
+function findSourceByKey(manifest: Manifest, sourceKey: string): SourceDefinition {
+  const source = manifest.sources.find((candidate) => candidate.key === sourceKey);
+  if (!source) {
+    throw new CliError(`Unknown source key: ${sourceKey}`, {
+      details: [`Declared sources: ${getSourceKeys(manifest)}`],
+    });
+  }
+
+  return source;
+}
+
+function findSourcesBySkill(manifest: Manifest, skillName: string): SourceDefinition[] {
+  return manifest.sources.filter((source) => source.include.includes(skillName));
+}
+
+function buildMissingSkillError(skillName: string, options: { sourceKey?: string; matchingKeys?: string[] } = {}): CliError {
+  const matchingKeys = options.matchingKeys ?? [];
+  const details = options.sourceKey
+    ? [`skill: ${skillName}`, `source: ${options.sourceKey}`]
+    : [`skill: ${skillName}`];
+
+  if (matchingKeys.length > 0) {
+    details.push(`matching sources: ${matchingKeys.join(", ")}`);
+  }
+
+  return new CliError(
+    options.sourceKey == null
+      ? `Skill "${skillName}" is not declared in sources.yaml.`
+      : `Skill "${skillName}" is not declared in source "${options.sourceKey}".`,
+    {
+      details,
+    },
+  );
 }
 
 export function createManifest(repoPath: string, options: CreateManifestOptions = {}): Manifest {
@@ -349,33 +418,86 @@ export function buildManifestEntries(manifest: Manifest, repoPath: string = mani
 }
 
 export function addSkillToManifest(manifest: Manifest, skillName: string, options: AddSkillOptions = {}): Manifest {
-  if (manifest.sources.length === 0) {
-    throw new CliError("Manifest does not declare any source blocks.", {
-      details: ["Run `skillsbase init` first or add a source block to `sources.yaml`."],
-    });
-  }
+  assertManifestHasSources(manifest);
 
   const selectedSource =
     options.sourceKey == null
       ? manifest.sources[0]
-      : manifest.sources.find((source) => source.key === options.sourceKey);
+      : findSourceByKey(manifest, options.sourceKey);
 
-  if (!selectedSource) {
-    throw new CliError(`Unknown source key: ${options.sourceKey}`, {
-      details: [`Declared sources: ${manifest.sources.map((source) => source.key).join(", ")}`],
+  return cloneManifestWithSources(
+    manifest,
+    manifest.sources.map((source) => {
+      if (source.key !== selectedSource.key) {
+        return source;
+      }
+
+      return {
+        ...source,
+        include: sortInclude(new Set(source.include ?? []).add(skillName)),
+      };
+    }),
+  );
+}
+
+export function removeSkillFromManifest(
+  manifest: Manifest,
+  skillName: string,
+  options: RemoveSkillOptions = {},
+): Manifest {
+  assertManifestHasSources(manifest);
+
+  const selectedSource = options.sourceKey == null ? null : findSourceByKey(manifest, options.sourceKey);
+  if (selectedSource != null) {
+    if (!selectedSource.include.includes(skillName)) {
+      const matchingKeys = findSourcesBySkill(manifest, skillName).map((source) => source.key);
+      throw buildMissingSkillError(skillName, { sourceKey: selectedSource.key, matchingKeys });
+    }
+
+    return cloneManifestWithSources(
+      manifest,
+      manifest.sources.map((source) => {
+        if (source.key !== selectedSource.key) {
+          return source;
+        }
+
+        return {
+          ...source,
+          include: sortInclude(source.include.filter((candidate) => candidate !== skillName)),
+        };
+      }),
+    );
+  }
+
+  const matchingSources = findSourcesBySkill(manifest, skillName);
+  if (matchingSources.length === 0) {
+    throw buildMissingSkillError(skillName);
+  }
+
+  if (matchingSources.length > 1) {
+    const matchingKeys = matchingSources.map((source) => source.key).sort((left, right) => left.localeCompare(right));
+    throw new CliError(`Skill "${skillName}" is declared in multiple sources.`, {
+      details: [
+        `matching sources: ${matchingKeys.join(", ")}`,
+        `Use \`skillsbase remove ${skillName} --source <key>\` to disambiguate.`,
+      ],
     });
   }
 
-  const include = new Set(selectedSource.include ?? []);
-  include.add(skillName);
-  selectedSource.include = [...include].sort((left, right) => left.localeCompare(right));
+  const [uniqueSource] = matchingSources;
+  return cloneManifestWithSources(
+    manifest,
+    manifest.sources.map((source) => {
+      if (source.key !== uniqueSource.key) {
+        return source;
+      }
 
-  return {
-    ...manifest,
-    sources: manifest.sources.map((source) =>
-      source.key === selectedSource.key ? { ...selectedSource } : { ...source, include: [...source.include] },
-    ),
-  };
+      return {
+        ...source,
+        include: sortInclude(source.include.filter((candidate) => candidate !== skillName)),
+      };
+    }),
+  );
 }
 
 export function buildMetadata(manifest: Manifest, entry: ManifestEntry, installRecord: InstallRecord): SyncMetadata {

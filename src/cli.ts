@@ -3,6 +3,7 @@ import path from "node:path";
 import { runAddCommand } from "./commands/add.js";
 import { runGithubActionCommand } from "./commands/github-action.js";
 import { runInitCommand } from "./commands/init.js";
+import { runRemoveCommand } from "./commands/remove.js";
 import { runSyncCommand } from "./commands/sync.js";
 import { CliError, printCommandResult, printCommandUsage } from "./lib/output.js";
 import { parseArgv } from "./lib/parse-argv.js";
@@ -21,6 +22,7 @@ const commandMap = new Map<string, CommandHandler>([
   ["init", runInitCommand],
   ["sync", runSyncCommand],
   ["add", runAddCommand],
+  ["remove", runRemoveCommand],
   ["github_action", runGithubActionCommand],
   ["github-action", runGithubActionCommand],
 ]);

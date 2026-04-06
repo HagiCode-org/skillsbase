@@ -48,6 +48,12 @@ skillsbase sync --repo /path/to/target-repo
 skillsbase add documentation-writer --repo /path/to/target-repo
 ```
 
+删除单个技能并立即同步：
+
+```bash
+skillsbase remove documentation-writer --repo /path/to/target-repo
+```
+
 生成受管 GitHub Actions 资产：
 
 ```bash
@@ -62,6 +68,7 @@ skillsbase github_action --repo /path/to/target-repo --kind all
 | `sync` | 按 `sources.yaml` 对账并同步技能 | `skillsbase sync --repo ./my-skills-repo` |
 | `sync --check` | 只校验漂移，不写文件 | `skillsbase sync --check --repo ./my-skills-repo` |
 | `add <skill-name>` | 将技能写入 source block 后执行同步 | `skillsbase add documentation-writer --repo ./my-skills-repo` |
+| `remove <skill-name>` | 从 source block 删除技能后执行同步 | `skillsbase remove documentation-writer --repo ./my-skills-repo` |
 | `github_action` | 生成受管 GitHub Actions 工作流或 action 文件 | `skillsbase github_action --repo ./my-skills-repo --kind workflow` |
 
 全局选项：
@@ -88,6 +95,8 @@ skillsbase github_action --repo /path/to/target-repo --kind all
   - first-party：`$HOME/.agents/skills`
   - system：`$HOME/.codex/skills/.system`
 - `add` 默认写入第一个已声明的 source block；如需指定，传 `--source <key>`。
+- `remove` 若仅命中一个 source block，会直接删除；若同名技能存在于多个 source block，必须显式传 `--source <key>`。
+- `add`、`remove`、`sync` 均接受 `--allow-missing-sources`，以便在 CI 或仓库外 cwd 下保持一致的路径解析与失败语义。
 - `github_action` 默认使用 `--kind workflow`。
 - 若上下文不足以安全写入，CLI 会直接失败并输出诊断，不会进入交互提问。
 

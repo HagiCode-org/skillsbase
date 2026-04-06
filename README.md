@@ -48,6 +48,12 @@ Add one skill and sync immediately:
 skillsbase add documentation-writer --repo /path/to/target-repo
 ```
 
+Remove one skill and sync immediately:
+
+```bash
+skillsbase remove documentation-writer --repo /path/to/target-repo
+```
+
 Generate managed GitHub Actions assets:
 
 ```bash
@@ -62,6 +68,7 @@ skillsbase github_action --repo /path/to/target-repo --kind all
 | `sync` | Reconcile managed skills from `sources.yaml`. | `skillsbase sync --repo ./my-skills-repo` |
 | `sync --check` | Validate drift without writing files. | `skillsbase sync --check --repo ./my-skills-repo` |
 | `add <skill-name>` | Add a skill to a source block, then run sync. | `skillsbase add documentation-writer --repo ./my-skills-repo` |
+| `remove <skill-name>` | Remove a skill from a source block, then run sync. | `skillsbase remove documentation-writer --repo ./my-skills-repo` |
 | `github_action` | Generate managed GitHub Actions workflow or action files. | `skillsbase github_action --repo ./my-skills-repo --kind workflow` |
 
 Global options:
@@ -88,6 +95,8 @@ Global options:
   - first-party: `$HOME/.agents/skills`
   - system: `$HOME/.codex/skills/.system`
 - `add` writes to the first declared source block unless `--source <key>` is provided.
+- `remove` deletes from the only matching source block automatically; if multiple source blocks include the same skill, pass `--source <key>`.
+- `add`, `remove`, and `sync` accept `--allow-missing-sources` to keep path-resolution behavior consistent in CI or repo-external execution.
 - `github_action` defaults to `--kind workflow`.
 - When the CLI does not have enough context to write safely, it fails with diagnostics instead of prompting interactively.
 

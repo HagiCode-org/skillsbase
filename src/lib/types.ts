@@ -72,8 +72,11 @@ export interface ManifestEntry {
   sourceKey: string;
   sourceLabel: string;
   sourceKind: string;
+  remoteSource: boolean;
   sourceRoot: string;
   sourcePath: string;
+  resolvedSourceRoot: string;
+  resolvedSourcePath: string;
   originalName: string;
   targetName: string;
   targetPath: string;

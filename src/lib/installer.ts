@@ -22,6 +22,18 @@ interface InstallOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+function toInstallReference(entry: ManifestEntry): string {
+  if (entry.remoteSource) {
+    return entry.sourcePath;
+  }
+
+  if (path.isAbsolute(entry.sourcePath) || entry.sourcePath.startsWith(`.${path.sep}`) || entry.sourcePath === ".") {
+    return entry.sourcePath;
+  }
+
+  return `.${path.sep}${entry.sourcePath}`;
+}
+
 function buildNpxArgs(manifest: Manifest, subcommand: string, extraArgs: string[]): string[] {
   return ["--yes", `skills@${manifest.skillsCliVersion}`, subcommand, ...extraArgs];
 }
@@ -41,6 +53,7 @@ export async function installIntoCurrentRepository(
   entry: ManifestEntry,
   options: InstallOptions = {},
 ): Promise<InstallState> {
+  const installReference = toInstallReference(entry);
   const installPath = path.join(repoPath, ".agents", "skills", entry.originalName);
   const lockPath = path.join(repoPath, "skills-lock.json");
   const snapshot: InstallSnapshot = {
@@ -48,13 +61,13 @@ export async function installIntoCurrentRepository(
     lockPath,
     installTree: await snapshotTree(installPath),
     lockText: await readFileIfExists(lockPath),
-    installReference: entry.sourcePath,
+    installReference,
   };
 
   try {
     await execFile(
       "npx",
-      buildNpxArgs(manifest, "add", [entry.sourcePath, "--agent", manifest.installAgent, "--copy", "-y"]),
+      buildNpxArgs(manifest, "add", [installReference, "--agent", manifest.installAgent, "--copy", "-y"]),
       {
         cwd: repoPath,
         env: options.env,
@@ -77,7 +90,7 @@ export async function installIntoCurrentRepository(
   return {
     installPath,
     lockPath,
-    installReference: entry.sourcePath,
+    installReference,
     snapshot,
   };
 }

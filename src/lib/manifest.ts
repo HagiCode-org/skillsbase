@@ -91,6 +91,34 @@ function validateSource(source: MutableSource): SourceDefinition {
   };
 }
 
+function isRemoteRepositorySource(source: Pick<SourceDefinition, "kind">): boolean {
+  return source.kind === "github-repository";
+}
+
+function buildSourcePath(source: SourceDefinition, originalName: string): string {
+  if (isRemoteRepositorySource(source)) {
+    return `${source.root}@${originalName}`;
+  }
+
+  return path.join(source.root, originalName);
+}
+
+function resolveSourceRoot(repoPath: string, source: SourceDefinition): string {
+  if (isRemoteRepositorySource(source) || path.isAbsolute(source.root)) {
+    return source.root;
+  }
+
+  return path.resolve(repoPath, source.root);
+}
+
+function resolveSourcePath(repoPath: string, source: SourceDefinition, originalName: string): string {
+  if (isRemoteRepositorySource(source)) {
+    return buildSourcePath(source, originalName);
+  }
+
+  return path.join(resolveSourceRoot(repoPath, source), originalName);
+}
+
 export function createManifest(repoPath: string, options: CreateManifestOptions = {}): Manifest {
   const remoteRepository = options.remoteRepository ?? path.basename(repoPath);
 
@@ -279,14 +307,19 @@ export function buildManifestEntries(manifest: Manifest, repoPath: string = mani
   const entries: ManifestEntry[] = [];
 
   for (const source of manifest.sources) {
+    const resolvedSourceRoot = resolveSourceRoot(repoPath, source);
+
     for (const originalName of source.include ?? []) {
       const targetName = `${source.targetPrefix ?? ""}${originalName}`;
       entries.push({
         sourceKey: source.key,
         sourceLabel: source.label,
         sourceKind: source.kind,
+        remoteSource: isRemoteRepositorySource(source),
         sourceRoot: source.root,
-        sourcePath: path.join(source.root, originalName),
+        sourcePath: buildSourcePath(source, originalName),
+        resolvedSourceRoot,
+        resolvedSourcePath: resolveSourcePath(repoPath, source, originalName),
         originalName,
         targetName,
         targetPath: path.join(repoPath, manifest.skillsRoot, targetName),

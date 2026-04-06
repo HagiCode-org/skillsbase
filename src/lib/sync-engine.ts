@@ -30,19 +30,23 @@ async function assertSourceState(
   entry: ManifestEntry,
   allowMissingSources: boolean,
 ): Promise<{ skip: false } | { skip: true; reason: string }> {
-  const sourceRootExists = await pathExists(entry.sourceRoot);
+  if (entry.remoteSource) {
+    return { skip: false };
+  }
+
+  const sourceRootExists = await pathExists(entry.resolvedSourceRoot);
   if (!sourceRootExists) {
     if (allowMissingSources) {
-      return { skip: true, reason: `missing source root: ${entry.sourceRoot}` };
+      return { skip: true, reason: `missing source root: ${entry.resolvedSourceRoot}` };
     }
 
-    throw new CliError(`Managed source root does not exist: ${entry.sourceRoot}`, {
+    throw new CliError(`Managed source root does not exist: ${entry.resolvedSourceRoot}`, {
       details: ["Use `skillsbase sync --allow-missing-sources` to skip missing roots."],
     });
   }
 
-  if (!(await pathExists(entry.sourcePath))) {
-    throw new CliError(`Managed skill is missing from source root: ${entry.sourcePath}`, {
+  if (!(await pathExists(entry.resolvedSourcePath))) {
+    throw new CliError(`Managed skill is missing from source root: ${entry.resolvedSourcePath}`, {
       details: [`source: ${entry.sourceKey}`, `skill: ${entry.originalName}`],
     });
   }

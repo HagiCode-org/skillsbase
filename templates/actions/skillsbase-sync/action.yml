@@ -1,0 +1,36 @@
+# Managed by skillsbase CLI.
+
+name: skillsbase-sync
+description: Validate a managed skillsbase repository and run sync in check mode
+
+inputs:
+  node-version:
+    description: Node.js version used for validation
+    required: false
+    default: "{{NODE_VERSION}}"
+  run-tests:
+    description: Whether to run npm test before sync --check
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Run tests
+      if: ${{ inputs.run-tests == 'true' }}
+      shell: bash
+      run: npm test
+
+    - name: Run sync check
+      shell: bash
+      run: node ./bin/skillsbase.mjs sync --check

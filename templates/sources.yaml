@@ -1,0 +1,25 @@
+# Managed by skillsbase CLI.
+# This template documents the expected manifest shape. The CLI serializes the real file.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: "{{REMOTE_REPOSITORY}}"
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: first-party
+    label: "First-party local skills"
+    kind: first-party
+    root: "{{FIRST_PARTY_ROOT}}"
+    targetPrefix: ""
+    include:
+      - "{{FIRST_PARTY_EXAMPLE}}"
+  - key: system
+    label: "Mirrored system skills"
+    kind: mirrored-system
+    root: "{{SYSTEM_ROOT}}"
+    targetPrefix: system-
+    include:
+      - "{{SYSTEM_EXAMPLE}}"

@@ -1,6 +1,6 @@
 {
   "name": "@hagicode/skillsbase",
-  "version": "0.1.0-dev.20260406025440.0.0.local",
+  "version": "0.1.0",
   "description": "Managed skills repository CLI",
   "homepage": "https://github.com/HagiCode-org/skillsbase#readme",
   "bugs": {
@@ -27,10 +27,12 @@
     "clean": "rm -rf dist",
     "cli": "node --import tsx ./src/cli-entry.ts",
     "pack:check": "node ./scripts/verify-package.mjs",
-    "publish:prepare-dev-version": "node ./scripts/prepare-dev-version.mjs",
+    "publish:resolve-dev-version": "node ./scripts/resolve-dev-version.mjs",
+    "publish:verify-readiness": "node ./scripts/verify-publish-readiness.mjs",
     "publish:verify-release": "node ./scripts/verify-release-version.mjs",
     "test": "node --import tsx --test ./tests/*.test.ts",
-    "smoke": "node --import tsx ./scripts/smoke.mjs"
+    "smoke": "node --import tsx ./scripts/smoke.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=22.12.0",

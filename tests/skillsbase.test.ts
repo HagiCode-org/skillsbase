@@ -6,11 +6,17 @@ import test from "node:test";
 
 import { runCli } from "../src/cli.js";
 
+interface CreateSkillOptions {
+  description?: string;
+  extraFiles?: Record<string, string>;
+  invalidFrontmatter?: boolean;
+}
+
 async function createTempDir() {
   return fs.mkdtemp(path.join(os.tmpdir(), "skillsbase-test-"));
 }
 
-async function createSkill(rootPath, name, options = {}) {
+async function createSkill(rootPath, name, options: CreateSkillOptions = {}) {
   const skillRoot = path.join(rootPath, name);
   await fs.mkdir(skillRoot, { recursive: true });
   await fs.writeFile(

@@ -226,7 +226,7 @@ export async function loadManifest(repoPath: string): Promise<Manifest> {
 
     const sourceStartMatch = /^  - key:\s*(.+)$/.exec(line);
     if (sourceStartMatch) {
-      currentSource = { key: parseScalar(sourceStartMatch[1]), include: [] };
+      currentSource = { key: String(parseScalar(sourceStartMatch[1])), include: [] };
       manifest.sources.push(currentSource);
       currentListKey = null;
       continue;

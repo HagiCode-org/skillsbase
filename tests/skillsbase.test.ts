@@ -72,10 +72,14 @@ if (args[0] !== "--yes" || !String(args[1] ?? "").startsWith("skills@")) {
 
 const command = args[2];
 if (command === "add") {
-  const sourcePath = path.resolve(args[3]);
+  const sourceReference = args[3];
+  const remoteMatch = /^([^./][^@]+)@([^/]+)$/.exec(sourceReference);
+  const sourcePath = remoteMatch
+    ? path.join(process.env.FAKE_NPX_REMOTE_SOURCE_ROOT ?? "", remoteMatch[2])
+    : path.resolve(sourceReference);
   const skillText = await fs.readFile(path.join(sourcePath, "SKILL.md"), "utf8");
   const frontmatter = parseFrontmatter(skillText);
-  const skillName = frontmatter.name ?? path.basename(sourcePath);
+  const skillName = frontmatter.name ?? remoteMatch?.[2] ?? path.basename(sourcePath);
   const installRoot = path.join(process.cwd(), ".agents", "skills", skillName);
 
   await fs.rm(installRoot, { recursive: true, force: true });
@@ -93,8 +97,8 @@ if (command === "add") {
         {
           schemaVersion: 1,
           skillSlug: skillName,
-          installReference: sourcePath,
-          source: sourcePath,
+          installReference: sourceReference,
+          source: remoteMatch?.[1] ?? sourcePath,
         },
         null,
         2,
@@ -108,7 +112,10 @@ if (command === "add") {
   try {
     lock = JSON.parse(await fs.readFile(lockPath, "utf8"));
   } catch {}
-  lock.skills[skillName] = { source: sourcePath, sourceType: "local" };
+  lock.skills[skillName] = {
+    source: sourceReference,
+    sourceType: remoteMatch ? "github" : "local",
+  };
   await fs.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\\n", "utf8");
   process.exit(0);
 }
@@ -151,6 +158,11 @@ async function runCommand({ cwd, args, env = {} }) {
 
 async function read(relativePath, repoPath) {
   return fs.readFile(path.join(repoPath, relativePath), "utf8");
+}
+
+async function writeManifest(repoPath, content) {
+  await fs.mkdir(repoPath, { recursive: true });
+  await fs.writeFile(path.join(repoPath, "sources.yaml"), content, "utf8");
 }
 
 test("init creates the managed repository baseline", async () => {
@@ -298,7 +310,11 @@ test("github_action writes managed workflow and action assets", async () => {
   assert.match(await read(".github/workflows/skills-sync.yml", repoPath), /Managed by skillsbase CLI/);
   assert.match(
     await read(".github/actions/skillsbase-sync/action.yml", repoPath),
-    /node \.\/bin\/skillsbase\.mjs sync --check/,
+    /npm install --global @hagicode\/skillsbase/,
+  );
+  assert.match(
+    await read(".github/actions/skillsbase-sync/action.yml", repoPath),
+    /skillsbase sync --check --repo \./,
   );
 });
 
@@ -428,4 +444,163 @@ test("sync surfaces uninstall cleanup failures", async () => {
   const result = await runCommand({ cwd: repoPath, env, args: ["sync", "--repo", repoPath] });
   assert.equal(result.exitCode, 1);
   assert.match(result.stderr, /skills uninstall failed/);
+});
+
+test("sync resolves repository-local relative source roots outside the repo working directory", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const externalCwd = path.join(tempRoot, "outside");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await fs.mkdir(externalCwd, { recursive: true });
+  await createSkill(path.join(repoPath, "embedded-sources", "cli"), "hagi", {
+    extraFiles: {
+      "references/cli-usage.md": "usage",
+    },
+  });
+
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: embedded-cli
+    label: "Embedded CLI skills"
+    kind: embedded-cli
+    root: embedded-sources/cli
+    targetPrefix: ""
+    include:
+      - hagi
+`,
+  );
+
+  const result = await runCommand({
+    cwd: externalCwd,
+    env,
+    args: ["sync", "--repo", repoPath],
+  });
+
+  assert.equal(result.exitCode, 0);
+  await fs.access(path.join(repoPath, "skills", "hagi", "SKILL.md"));
+
+  const metadata = JSON.parse(await read("skills/hagi/.skill-source.json", repoPath));
+  assert.equal(metadata.sourceRoot, "embedded-sources/cli");
+  assert.equal(metadata.sourcePath, path.join("embedded-sources", "cli", "hagi"));
+  assert.equal(metadata.installReference, `.${path.sep}${path.join("embedded-sources", "cli", "hagi")}`);
+});
+
+test("add reuses resolved relative source roots when invoked outside the repo working directory", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const externalCwd = path.join(tempRoot, "outside");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+
+  await fs.mkdir(externalCwd, { recursive: true });
+  await createSkill(path.join(repoPath, "embedded-sources", "cli"), "hagi");
+
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: embedded-cli
+    label: "Embedded CLI skills"
+    kind: embedded-cli
+    root: embedded-sources/cli
+    targetPrefix: ""
+    include:
+`,
+  );
+
+  const addResult = await runCommand({
+    cwd: externalCwd,
+    env,
+    args: ["add", "--repo", repoPath, "--source", "embedded-cli", "hagi"],
+  });
+
+  assert.equal(addResult.exitCode, 0);
+  assert.match(await read("sources.yaml", repoPath), /- hagi/);
+  await fs.access(path.join(repoPath, "skills", "hagi", "SKILL.md"));
+
+  const checkResult = await runCommand({
+    cwd: externalCwd,
+    env,
+    args: ["sync", "--check", "--repo", repoPath],
+  });
+  assert.equal(checkResult.exitCode, 0);
+});
+
+test("sync supports github repository roots via repo@skill references", async () => {
+  const tempRoot = await createTempDir();
+  const repoPath = path.join(tempRoot, "repo");
+  const remoteRoot = path.join(tempRoot, "remote-skills");
+  const fakeBin = await createFakeNpx(tempRoot);
+  const env = {
+    PATH: `${fakeBin}:${process.env.PATH}`,
+    FAKE_NPX_REMOTE_SOURCE_ROOT: remoteRoot,
+  };
+
+  await createSkill(remoteRoot, "hagi", {
+    extraFiles: {
+      "references/cli-usage.md": "usage",
+    },
+  });
+
+  await writeManifest(
+    repoPath,
+    `# Managed by skillsbase CLI.
+# Edit source entries to add or remove managed skills.
+version: 1
+skillsRoot: skills
+metadataFile: .skill-source.json
+managedBy: skillsbase
+remoteRepository: skillsbase-template
+staleCleanup: true
+skillsCliVersion: 1.4.8
+installAgent: codex
+sources:
+  - key: cli-github
+    label: "HagiCode CLI skills"
+    kind: github-repository
+    root: HagiCode-org/cli
+    targetPrefix: ""
+    include:
+      - hagi
+`,
+  );
+
+  const result = await runCommand({
+    cwd: repoPath,
+    env,
+    args: ["sync", "--repo", repoPath],
+  });
+
+  assert.equal(result.exitCode, 0);
+  await fs.access(path.join(repoPath, "skills", "hagi", "SKILL.md"));
+
+  const metadata = JSON.parse(await read("skills/hagi/.skill-source.json", repoPath));
+  assert.equal(metadata.sourceKey, "cli-github");
+  assert.equal(metadata.sourceKind, "github-repository");
+  assert.equal(metadata.sourceRoot, "HagiCode-org/cli");
+  assert.equal(metadata.sourcePath, "HagiCode-org/cli@hagi");
+  assert.equal(metadata.installReference, "HagiCode-org/cli@hagi");
+  assert.equal(metadata.installedMetadata.source, "HagiCode-org/cli");
 });

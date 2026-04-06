@@ -104,3 +104,13 @@ npm run pack:check
 ```
 
 The published entry point is `bin/skillsbase.mjs`. In development, `npm run cli -- <args>` runs the TypeScript entry directly.
+
+## Publishing Notes
+
+The GitHub Actions workflow supports two npm authentication modes:
+
+- Preferred: npm trusted publishing via GitHub Actions OIDC
+- Fallback: `NPM_TOKEN` repository secret mapped to `NODE_AUTH_TOKEN`
+
+Before relying on trusted publishing, make sure the npm package settings for `@hagicode/skillsbase` trust the `HagiCode-org/skillsbase` repository.
+The npm docs currently require Node.js `>= 22.14.0` and npm `>= 11.5.1` for trusted publishing.

@@ -104,3 +104,13 @@ npm run pack:check
 ```
 
 发布入口为 `bin/skillsbase.mjs`。开发期可用 `npm run cli -- <args>` 直接运行 TypeScript 入口。
+
+## 发布说明
+
+GitHub Actions 发布流支持两种 npm 认证模式：
+
+- 推荐：GitHub Actions OIDC 的 npm trusted publishing
+- 兜底：仓库 `NPM_TOKEN` secret，经 `NODE_AUTH_TOKEN` 注入
+
+若使用 trusted publishing，需先在 npm 的 `@hagicode/skillsbase` 包设置中，将 `HagiCode-org/skillsbase` 配置为 trusted publisher。
+npm 官方当前要求 Node.js `>= 22.14.0` 且 npm `>= 11.5.1`。

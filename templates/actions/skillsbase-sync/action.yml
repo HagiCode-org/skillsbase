@@ -26,6 +26,10 @@ runs:
       shell: bash
       run: npm ci
 
+    - name: Install skillsbase
+      shell: bash
+      run: npm install --global @hagicode/skillsbase
+
     - name: Run tests
       if: ${{ inputs.run-tests == 'true' }}
       shell: bash
@@ -33,4 +37,4 @@ runs:
 
     - name: Run sync check
       shell: bash
-      run: node ./bin/skillsbase.mjs sync --check
+      run: skillsbase sync --check --repo .

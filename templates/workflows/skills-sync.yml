@@ -32,8 +32,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install skillsbase
+        run: npm install --global @hagicode/skillsbase
+
       - name: Run tests
         run: npm test
 
       - name: Validate managed repository state
-        run: node ./bin/skillsbase.mjs sync --check
+        run: skillsbase sync --check --repo .

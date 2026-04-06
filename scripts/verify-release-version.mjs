@@ -3,14 +3,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { parseBaseVersion, readPackageVersion } from "./resolve-dev-version.mjs";
 
-function getTagName() {
-  const explicitTag = process.argv[2] ?? process.env.RELEASE_TAG_NAME ?? process.env.GITHUB_REF_NAME;
-  if (explicitTag) {
-    return explicitTag;
+export const STABLE_TAG_PATTERN = /^v(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$/;
+
+export function parseStableTag(tagName) {
+  const match = String(tagName ?? "").match(STABLE_TAG_PATTERN);
+
+  if (!match?.groups) {
+    throw new Error(`Release tags must use the stable vX.Y.Z format. Received: ${tagName}`);
   }
 
-  const eventPath = process.env.GITHUB_EVENT_PATH;
+  return `${match.groups.major}.${match.groups.minor}.${match.groups.patch}`;
+}
+
+export function readReleaseTagFromEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
   if (!eventPath || !fs.existsSync(eventPath)) {
     return undefined;
   }
@@ -23,26 +31,47 @@ function getTagName() {
   }
 }
 
-const tagName = getTagName();
-
-if (!tagName) {
-  throw new Error("Missing release tag. Pass a tag name or set GITHUB_REF_NAME.");
+export function resolveReleaseTag({
+  cliTag = process.argv[2],
+  env = process.env,
+  eventPath = env.GITHUB_EVENT_PATH,
+} = {}) {
+  return cliTag ?? env.RELEASE_TAG_NAME ?? env.GITHUB_REF_NAME ?? readReleaseTagFromEvent(eventPath);
 }
 
-const match = String(tagName).match(
-  /^v(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$/,
-);
+export function verifyReleaseVersion({
+  tagName = resolveReleaseTag(),
+  packageJsonPath = process.argv[3] ?? "package.json",
+} = {}) {
+  if (!tagName) {
+    throw new Error("Missing release tag. Pass a tag name or set GITHUB_REF_NAME.");
+  }
 
-if (!match?.groups) {
-  throw new Error(`Release tags must use the stable vX.Y.Z format. Received: ${tagName}`);
+  const expectedVersion = parseStableTag(tagName);
+  const resolvedPackageJsonPath = path.resolve(packageJsonPath);
+  const packageVersion = readPackageVersion(resolvedPackageJsonPath);
+  const packageBaseVersion = parseBaseVersion(packageVersion);
+
+  return {
+    packageJsonPath: resolvedPackageJsonPath,
+    packageVersion,
+    packageBaseVersion,
+    tagName,
+    version: expectedVersion,
+  };
 }
 
-const expectedVersion = `${match.groups.major}.${match.groups.minor}.${match.groups.patch}`;
-const packageJsonPath = path.resolve(process.argv[3] ?? "package.json");
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-
-if (packageJson.version !== expectedVersion) {
-  throw new Error(`Tag ${tagName} does not match package.json version ${packageJson.version}.`);
+async function main() {
+  const { version } = verifyReleaseVersion();
+  process.stdout.write(version);
 }
 
-process.stdout.write(expectedVersion);
+const entryPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+
+if (entryPath === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exitCode = 1;
+  });
+}

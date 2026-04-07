@@ -1,0 +1,96 @@
+# Managed by skillsbase CLI.
+
+name: skillsbase-manage
+description: Run a managed add, remove, or sync operation for a skillsbase repository
+
+inputs:
+  node-version:
+    description: Node.js version used for maintenance
+    required: false
+    default: "{{NODE_VERSION}}"
+  operation:
+    description: Maintenance operation to run (`add`, `remove`, or `sync`)
+    required: true
+  skill-name:
+    description: Skill name for `add` or `remove`
+    required: false
+    default: ""
+  source:
+    description: Optional source key for `add` or `remove`
+    required: false
+    default: ""
+  allow-missing-sources:
+    description: Skip missing local roots during the operation
+    required: false
+    default: "false"
+  run-tests:
+    description: Whether to run npm test after the maintenance command
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Upgrade npm
+      shell: bash
+      run: npm install --global npm@10.9.2
+
+    - name: Install skillsbase
+      shell: bash
+      run: npm install --global @hagicode/skillsbase
+
+    - name: Run maintenance command
+      shell: bash
+      env:
+        OPERATION: ${{ inputs.operation }}
+        SKILL_NAME: ${{ inputs.skill-name }}
+        SOURCE: ${{ inputs.source }}
+        ALLOW_MISSING_SOURCES: ${{ inputs.allow-missing-sources }}
+      run: |
+        set -euo pipefail
+
+        base_args=(--repo .)
+        if [[ "${ALLOW_MISSING_SOURCES}" == "true" ]]; then
+          base_args+=(--allow-missing-sources)
+        fi
+
+        case "${OPERATION}" in
+          add|remove)
+            if [[ -z "${SKILL_NAME}" ]]; then
+              echo "::error::skill-name is required when operation=${OPERATION}."
+              exit 1
+            fi
+
+            command=(skillsbase "${OPERATION}" "${SKILL_NAME}" "${base_args[@]}")
+            if [[ -n "${SOURCE}" ]]; then
+              command+=(--source "${SOURCE}")
+            fi
+            ;;
+          sync)
+            command=(skillsbase sync "${base_args[@]}")
+            ;;
+          *)
+            echo "::error::Unsupported operation: ${OPERATION}."
+            exit 1
+            ;;
+        esac
+
+        printf 'Running:'
+        printf ' %q' "${command[@]}"
+        printf '\n'
+        "${command[@]}"
+
+    - name: Run tests
+      if: ${{ inputs.run-tests == 'true' }}
+      shell: bash
+      run: npm test

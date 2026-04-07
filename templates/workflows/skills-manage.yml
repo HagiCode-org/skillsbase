@@ -1,0 +1,54 @@
+# Managed by skillsbase CLI.
+
+name: Skills Manage
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation to run (`add`, `remove`, or `sync`)
+        required: true
+        type: choice
+        default: sync
+        options:
+          - add
+          - remove
+          - sync
+      skill-name:
+        description: Skill name for `add` or `remove`
+        required: false
+        type: string
+      source:
+        description: Optional source key for `add` or `remove`
+        required: false
+        type: string
+      allow-missing-sources:
+        description: Skip missing local roots during the operation
+        required: false
+        type: boolean
+        default: false
+      run-tests:
+        description: Run `npm test` after the maintenance command
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run skillsbase maintenance
+        uses: ./.github/actions/skillsbase-manage
+        with:
+          node-version: {{NODE_VERSION}}
+          operation: ${{ inputs.operation }}
+          skill-name: ${{ inputs.skill-name }}
+          source: ${{ inputs.source }}
+          allow-missing-sources: ${{ inputs.allow-missing-sources }}
+          run-tests: ${{ inputs.run-tests }}

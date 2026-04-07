@@ -201,7 +201,9 @@ test("init creates the managed repository baseline", async () => {
   await fs.access(path.join(repoPath, "skills", "README.md"));
   await fs.access(path.join(repoPath, "docs", "maintainer-workflow.md"));
   await fs.access(path.join(repoPath, ".github", "workflows", "skills-sync.yml"));
+  await fs.access(path.join(repoPath, ".github", "workflows", "skills-manage.yml"));
   await fs.access(path.join(repoPath, ".github", "actions", "skillsbase-sync", "action.yml"));
+  await fs.access(path.join(repoPath, ".github", "actions", "skillsbase-manage", "action.yml"));
   assert.match(await read("sources.yaml", repoPath), /remoteRepository: example\/skillsbase/);
 });
 
@@ -500,15 +502,68 @@ test("github_action writes managed workflow and action assets", async () => {
   });
 
   assert.equal(result.exitCode, 0);
-  assert.match(await read(".github/workflows/skills-sync.yml", repoPath), /Managed by skillsbase CLI/);
+  const [syncWorkflow, manageWorkflow, syncAction, manageAction] = await Promise.all([
+    read(".github/workflows/skills-sync.yml", repoPath),
+    read(".github/workflows/skills-manage.yml", repoPath),
+    read(".github/actions/skillsbase-sync/action.yml", repoPath),
+    read(".github/actions/skillsbase-manage/action.yml", repoPath),
+  ]);
+
+  assert.match(syncWorkflow, /Managed by skillsbase CLI/);
+  assert.match(syncWorkflow, /uses: \.\/\.github\/actions\/skillsbase-sync/);
+  assert.match(syncWorkflow, /run-tests: "true"/);
+
+  assert.match(manageWorkflow, /workflow_dispatch:/);
+  assert.match(manageWorkflow, /operation:/);
+  assert.match(manageWorkflow, /skill-name:/);
+  assert.match(manageWorkflow, /allow-missing-sources:/);
+  assert.match(manageWorkflow, /uses: \.\/\.github\/actions\/skillsbase-manage/);
+
   assert.match(
-    await read(".github/actions/skillsbase-sync/action.yml", repoPath),
+    syncAction,
     /npm install --global @hagicode\/skillsbase/,
   );
   assert.match(
-    await read(".github/actions/skillsbase-sync/action.yml", repoPath),
+    syncAction,
     /skillsbase sync --check --repo \./,
   );
+  assert.match(manageAction, /operation:\n    description:/);
+  assert.match(manageAction, /skill-name:\n    description:/);
+  assert.match(manageAction, /allow-missing-sources:/);
+  assert.match(manageAction, /case "\$\{OPERATION\}" in/);
+  assert.match(manageAction, /command=\(skillsbase "\$\{OPERATION\}"/);
+  assert.match(manageAction, /command=\(skillsbase sync "\$\{base_args\[@\]\}"\)/);
+});
+
+test("github_action kind-specific generation keeps workflow and action pairs together", async () => {
+  const tempRoot = await createTempDir();
+  const workflowRepoPath = path.join(tempRoot, "workflow-repo");
+  await fs.mkdir(workflowRepoPath, { recursive: true });
+
+  const workflowResult = await runCommand({
+    cwd: workflowRepoPath,
+    args: ["github_action", "--repo", workflowRepoPath, "--kind", "workflow"],
+  });
+
+  assert.equal(workflowResult.exitCode, 0);
+  assert.equal(await exists(path.join(workflowRepoPath, ".github", "workflows", "skills-sync.yml")), true);
+  assert.equal(await exists(path.join(workflowRepoPath, ".github", "workflows", "skills-manage.yml")), true);
+  assert.equal(await exists(path.join(workflowRepoPath, ".github", "actions", "skillsbase-sync", "action.yml")), true);
+  assert.equal(await exists(path.join(workflowRepoPath, ".github", "actions", "skillsbase-manage", "action.yml")), true);
+
+  const actionRepoPath = path.join(tempRoot, "action-repo");
+  await fs.mkdir(actionRepoPath, { recursive: true });
+
+  const actionResult = await runCommand({
+    cwd: actionRepoPath,
+    args: ["github_action", "--repo", actionRepoPath, "--kind", "action"],
+  });
+
+  assert.equal(actionResult.exitCode, 0);
+  assert.equal(await exists(path.join(actionRepoPath, ".github", "actions", "skillsbase-sync", "action.yml")), true);
+  assert.equal(await exists(path.join(actionRepoPath, ".github", "actions", "skillsbase-manage", "action.yml")), true);
+  assert.equal(await exists(path.join(actionRepoPath, ".github", "workflows", "skills-sync.yml")), false);
+  assert.equal(await exists(path.join(actionRepoPath, ".github", "workflows", "skills-manage.yml")), false);
 });
 
 test("sync fails with actionable diagnostics when the manifest is missing", async () => {

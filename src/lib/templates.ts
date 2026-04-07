@@ -26,6 +26,11 @@ interface WriteGithubActionsOptions extends WriteManagedFileOptions {
   kind?: GithubActionKind;
 }
 
+interface GithubActionTemplateTarget {
+  relativePath: string;
+  template: string;
+}
+
 async function resolveTemplateRoot(): Promise<string> {
   for (const candidate of templateRootCandidates) {
     if (await pathExists(candidate)) {
@@ -98,19 +103,31 @@ export async function writeGithubActions(
     NODE_VERSION: DEFAULT_NODE_VERSION,
   };
 
-  const targets: Array<{ relativePath: string; template: string }> = [];
+  const targets: GithubActionTemplateTarget[] = [];
   if (kind === "workflow" || kind === "all") {
-    targets.push({
-      relativePath: path.join(".github", "workflows", "skills-sync.yml"),
-      template: path.join("workflows", "skills-sync.yml"),
-    });
+    targets.push(
+      {
+        relativePath: path.join(".github", "workflows", "skills-sync.yml"),
+        template: path.join("workflows", "skills-sync.yml"),
+      },
+      {
+        relativePath: path.join(".github", "workflows", "skills-manage.yml"),
+        template: path.join("workflows", "skills-manage.yml"),
+      },
+    );
   }
 
-  if (kind === "action" || kind === "all") {
-    targets.push({
-      relativePath: path.join(".github", "actions", "skillsbase-sync", "action.yml"),
-      template: path.join("actions", "skillsbase-sync", "action.yml"),
-    });
+  if (kind === "workflow" || kind === "action" || kind === "all") {
+    targets.push(
+      {
+        relativePath: path.join(".github", "actions", "skillsbase-sync", "action.yml"),
+        template: path.join("actions", "skillsbase-sync", "action.yml"),
+      },
+      {
+        relativePath: path.join(".github", "actions", "skillsbase-manage", "action.yml"),
+        template: path.join("actions", "skillsbase-manage", "action.yml"),
+      },
+    );
   }
 
   if (targets.length === 0) {

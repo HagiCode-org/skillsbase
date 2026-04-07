@@ -23,23 +23,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Run skillsbase validation
+        uses: ./.github/actions/skillsbase-sync
         with:
           node-version: {{NODE_VERSION}}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Upgrade npm
-        run: npm install --global npm@10.9.2
-
-      - name: Install skillsbase
-        run: npm install --global @hagicode/skillsbase
-
-      - name: Run tests
-        run: npm test
-
-      - name: Validate managed repository state
-        run: skillsbase sync --check --repo .
+          run-tests: "true"

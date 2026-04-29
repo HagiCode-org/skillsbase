@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/%40hagicode%2Fskillsbase?logo=npm&color=cb3837)](https://www.npmjs.com/package/@hagicode/skillsbase)
 [![npm downloads](https://img.shields.io/npm/dm/%40hagicode%2Fskillsbase?logo=npm&color=2d8cf0)](https://www.npmjs.com/package/@hagicode/skillsbase)
+[![license](https://img.shields.io/badge/license-MIT-ffd43b)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 `skillsbase` is a standalone Node.js CLI for bootstrapping and maintaining managed skills repositories.
@@ -123,3 +124,7 @@ The GitHub Actions workflow supports two npm authentication modes:
 
 Before relying on trusted publishing, make sure the npm package settings for `@hagicode/skillsbase` trust the `HagiCode-org/skillsbase` repository.
 The npm docs currently require Node.js `>= 22.14.0` and npm `>= 11.5.1` for trusted publishing.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

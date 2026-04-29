@@ -144,3 +144,23 @@ test("verify-publish-readiness validates trusted publisher toolchain and auth mo
     /Ensure npm package settings trust GitHub repository HagiCode-org\/skillsbase/,
   );
 });
+
+test("verify-publish-readiness warns instead of failing for a first trusted publish", () => {
+  const packageJsonPath = createPackageJson("0.1.0");
+  const result = verifyPublishReadiness({
+    packageJsonPath,
+    env: {
+      GITHUB_REPOSITORY: "HagiCode-org/skillsbase",
+    },
+    nodeVersion: "24.1.0",
+    npmVersion: "11.6.0",
+    lookupPublishedVersion: () => undefined,
+  });
+
+  assert.equal(result.publishedVersion, undefined);
+  assert.match(
+    result.warnings[1],
+    /Package @hagicode\/skillsbase is not visible in https:\/\/registry\.npmjs\.org\//,
+  );
+  assert.match(result.warnings[1], /workflow filename npm-publish\.yml/);
+});

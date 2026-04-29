@@ -145,11 +145,11 @@ export function verifyPublishReadiness({
   }
 
   if (!publishedVersion && authMode === "trusted-publisher") {
-    throw new Error(
+    warnings.push(
       [
         `Package ${metadata.packageName} is not visible in ${metadata.registry}.`,
-        "First publishes for a scoped package usually need an owner token or prior npm package setup.",
-        "Set the NPM_TOKEN secret for this workflow or publish once with an owner account before retrying trusted publishing.",
+        "This can be normal before the first successful publish.",
+        "Confirm the npm scope exists, the publishing identity can create or update the package, and the trusted publisher entry points to workflow filename npm-publish.yml.",
       ].join(" "),
     );
   }

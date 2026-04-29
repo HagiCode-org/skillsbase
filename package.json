@@ -2,6 +2,7 @@
   "name": "@hagicode/skillsbase",
   "version": "0.1.0",
   "description": "Managed skills repository CLI",
+  "license": "MIT",
   "homepage": "https://github.com/HagiCode-org/skillsbase#readme",
   "bugs": {
     "url": "https://github.com/HagiCode-org/skillsbase/issues"

@@ -123,6 +123,8 @@ The GitHub Actions workflow supports two npm authentication modes:
 - Fallback: `NPM_TOKEN` repository secret mapped to `NODE_AUTH_TOKEN`
 
 Before relying on trusted publishing, make sure the npm package settings for `@hagicode/skillsbase` trust the `HagiCode-org/skillsbase` repository.
+Use workflow filename `npm-publish.yml` in npm trusted publisher settings, not the full `.github/workflows/...` path.
+If the package has not been published before, that is still acceptable as long as the `hagicode` scope already exists and the publishing identity can create `@hagicode/skillsbase`.
 The npm docs currently require Node.js `>= 22.14.0` and npm `>= 11.5.1` for trusted publishing.
 
 ## License

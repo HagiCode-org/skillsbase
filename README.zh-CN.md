@@ -122,4 +122,6 @@ GitHub Actions 发布流支持两种 npm 认证模式：
 - 兜底：仓库 `NPM_TOKEN` secret，经 `NODE_AUTH_TOKEN` 注入
 
 若使用 trusted publishing，需先在 npm 的 `@hagicode/skillsbase` 包设置中，将 `HagiCode-org/skillsbase` 配置为 trusted publisher。
+在 npm trusted publisher 设置里填写的 workflow filename 应为 `npm-publish.yml`，不要填完整的 `.github/workflows/...` 路径。
+如果这个包还没有首发，只要 npm 上已经存在 `hagicode` scope，且当前发布身份有权创建 `@hagicode/skillsbase`，也仍然可以正常发布。
 npm 官方当前要求 Node.js `>= 22.14.0` 且 npm `>= 11.5.1`。

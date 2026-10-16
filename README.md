@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/%40hagicode%2Fskillsbase?logo=npm&color=cb3837)](https://www.npmjs.com/package/@hagicode/skillsbase)
 [![npm downloads](https://img.shields.io/npm/dm/%40hagicode%2Fskillsbase?logo=npm&color=2d8cf0)](https://www.npmjs.com/package/@hagicode/skillsbase)
 [![license](https://img.shields.io/badge/license-MIT-ffd43b)](./LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 `skillsbase` is a standalone Node.js CLI for bootstrapping and maintaining managed skills repositories.
 It ships the CLI and templates only. The generated `skills/` content belongs in the target repository, not in this package repository.
@@ -14,7 +14,7 @@ It ships the CLI and templates only. The generated `skills/` content belongs in 
 
 Requirements:
 
-- Node.js `>= 22.12.0`
+- Node.js `>= 24.0.0`
 - npm `>= 10.9.2`
 
 Install globally:

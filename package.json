@@ -1,7 +1,7 @@
 {
   "name": "@hagicode/skillsbase",
   "version": "0.1.0",
-  "description": "Managed skills repository CLI",
+  "description": "CLI for bootstrapping and maintaining managed agent skills repositories",
   "license": "MIT",
   "homepage": "https://github.com/HagiCode-org/skillsbase#readme",
   "bugs": {
@@ -10,6 +10,21 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HagiCode-org/skillsbase.git"
+  },
+  "keywords": [
+    "hagicode",
+    "hagicode-org",
+    "skills",
+    "agent-skills",
+    "skillsbase",
+    "claude-code",
+    "ai-agent",
+    "cli",
+    "templates"
+  ],
+  "author": {
+    "name": "HagiCode",
+    "url": "https://github.com/HagiCode-org"
   },
   "type": "module",
   "packageManager": "npm@10.9.2",

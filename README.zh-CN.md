@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/%40hagicode%2Fskillsbase?logo=npm&color=cb3837)](https://www.npmjs.com/package/@hagicode/skillsbase)
 [![npm downloads](https://img.shields.io/npm/dm/%40hagicode%2Fskillsbase?logo=npm&color=2d8cf0)](https://www.npmjs.com/package/@hagicode/skillsbase)
+[![license](https://img.shields.io/badge/license-MIT-ffd43b)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 `skillsbase` 是一个独立的 Node.js CLI，用于初始化并维护受管 skills 仓库。

@@ -17,14 +17,23 @@ Run commands from `repos/skillsbase/`.
 ```bash
 npm install
 npm run build
+npm run typecheck
 npm test
+npm run smoke
+npm run pack:check
+npm run cli -- --help
 ```
+
+Requires Node.js 24+ (`engines` in `package.json`).
 
 ## Key Paths
 
 - `bin/skillsbase.mjs`: CLI entrypoint
-- `src/`: CLI source
+- `src/`: CLI source (`commands/` for init, sync, add, remove, github-action; `lib/` for the shared engine)
 - `templates/`: skillsbase repository templates
+- `scripts/`: package verification, smoke test and publish version helpers
+- `tests/`: `node --test` suites run through `tsx`
+- `.github/workflows/`: `npm-publish.yml` (push to `main` publishes the `dev` tag, a published release publishes `latest`) and `release-draft-action.yml` (drafts only, never publishes)
 
 ## Agent Guidelines
 

@@ -39,7 +39,7 @@
     "README.zh-CN.md"
   ],
   "scripts": {
-    "build": "vite build",
+    "build": "export NODE_OPTIONS=\"${NODE_OPTIONS:-} --max-old-space-size=8192\"; vite build",
     "clean": "rm -rf dist",
     "cli": "node --import tsx ./src/cli-entry.ts",
     "pack:check": "node ./scripts/verify-package.mjs",
@@ -48,7 +48,7 @@
     "publish:verify-release": "node ./scripts/verify-release-version.mjs",
     "test": "node --import tsx --test ./tests/*.test.ts",
     "smoke": "node --import tsx ./scripts/smoke.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "export NODE_OPTIONS=\"${NODE_OPTIONS:-} --max-old-space-size=8192\"; tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=24.0.0",
